@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Static resources of the project
+Resources:
+  #SecurityGroup for the Forward facing LoadBalancer
+  ExtLBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP access via user defined port
+      SecurityGroupIngress:
+      - CidrIp: 10.0.0.0/24
+        FromPort: 443
+        IpProtocol: tcp
+        ToPort: 443
+
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: allow connections from External LoadBalancer
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        SourceSecurityGroupId: !GetAtt ExtLBSecurityGroup.GroupId
+        ToPort: 80
+
+  #SecurityGroup Internal LB
+  InternalLBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP access via user defined port
+      SecurityGroupIngress:
+        FromPort: 80
+        IpProtocol: tcp
+        ToPort: 80
+        SourceSecurityGroupId: !GetAtt WebServerSecurityGroup.GroupId
+
+  AppServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: allow connections from Internal LoadBalancer
+      SecurityGroupIngress:
+      - FromPort: 80
+        IpProtocol: tcp
+        ToPort: 80
+        SourceSecurityGroupId: !GetAtt InternalLBSecurityGroup.GroupId
+      - FromPort: 22
+        IpProtocol: tcp
+        ToPort: 22
+        CidrIp: '10.0.0.0/8'
+  
+  DBEC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Open database for access for the AppServer Resources
+      SecurityGroupIngress:
+      - FromPort: '3306'
+        IpProtocol: tcp
+        ToPort: '3306'
+        SourceSecurityGroupId: !GetAtt AppServerSecurityGroup.GroupId
+
+Outputs:
+  WebServerSecurityGroup:
+    Description: The security group ID to use for the public WebServerGroup
+    Value:
+      'Fn::GetAtt':
+        - WebServerSecurityGroup
+        - GroupId
+    Export:
+      Name:
+        'Fn::Sub': '${AWS::StackName}Web-SecurityGroupID'
+
+  AppServerSecurityGroup:
+    Description: The security group ID to use for the Application ServerGroup
+    Value: {Ref: AppServerSecurityGroup }
+    Export:
+      Name:
+        'Fn::Sub': '${AWS::StackName}-App-SecurityGroupID'
+
+  InternalLBSecurityGroup:
+    Description: The security group ID to use for the Internal LoadBalancer
+    Value: {Ref: InternalLBSecurityGroup}
+    Export:
+      Name:
+        'Fn::Sub': '${AWS::StackName}-Int-SecurityGroupID'
+
+  ExtLBSecurityGroup:
+    Description: The security group ID to use for the Application ServerGroup
+    Value: {Ref: ExtLBSecurityGroup} 
+    Export:
+      Name:
+        'Fn::Sub': '${AWS::StackName}-Ext-SecurityGroupID'
+
+  DBEC2SecurityGroup:
+    Description: The security group ID to use for the relational database
+    Value: {Ref: DBEC2SecurityGroup}
+    Export:
+      Name:
+        'Fn::Sub': '${AWS::StackName}-DB-SecurityGroupID'
